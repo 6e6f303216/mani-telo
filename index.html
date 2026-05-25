@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ma Toki Pona — Island Tycoon</title>
+  <style>
+    :root {
+      --bg-dark: #4fa1db;
+      --bg-panel: #e6c888;
+      --border-color: #3e2723;
+      --text-main: #3e2723;
+      --text-muted: #5d4037;
+      --accent: #29b6f6;
+      --accent-hover: #03a9f4;
+      --success: #2e7d32;
+      --warning: #d84315;
+      --danger: #c62828;
+      --btn-green: #85c365;
+      --btn-locked: #7a6c5f;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    @import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap');
+    
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Pixelify Sans', system-ui, sans-serif;
+      overflow: hidden;
+      height: 100dvh;
+      user-select: none;
+      image-rendering: pixelated;
+    }
+
+    #app {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      grid-template-rows: 60px 1fr auto;
+      grid-template-areas:
+        "topbar topbar"
+        "sidebar canvas"
+        "sidebar build";
+      height: 100dvh;
+      width: 100vw;
+    }
+
+    .topbar {
+      grid-area: topbar;
+      background: var(--bg-panel);
+      border-bottom: 3px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 20px;
+      z-index: 10;
+    }
+
+    .topbar .logo {
+      font-weight: 700;
+      font-size: 20px;
+      color: #85c365;
+      text-shadow: 2px 2px 0 var(--border-color);
+      letter-spacing: 1px;
+    }
+    .topbar .logo span { color: #8991e4; font-weight: 700; }
+
+    .topbar .stats {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.4);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      border: 2px solid var(--border-color);
+      box-shadow: 0 2px 0 var(--border-color);
+    }
+    .stat-item .icon { font-size: 16px; }
+    .stat-item .value { color: var(--text-main); }
+    .stat-item .rate { color: var(--text-muted); font-weight: 600; font-size: 11px; }
+
+    .sidebar {
+      grid-area: sidebar;
+      background: var(--bg-panel);
+      border-right: 3px solid var(--border-color);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      z-index: 10;
+      flex-wrap: wrap;
+    }
+
+    .sidebar-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--text-main);
+      padding: 10px 6px 4px;
+      letter-spacing: 1px;
+      font-weight: 800;
+    }
+
+    .chain-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: all 0.1s ease;
+      border: 2px solid var(--border-color);
+      background: var(--btn-green);
+      color: var(--text-main);
+      width: 100%;
+      text-align: left;
+      box-shadow: 0 4px 0 var(--border-color);
+    }
+
+    .chain-btn:active { transform: translateY(4px); box-shadow: 0 0 0 var(--border-color); }
+    .chain-btn.locked { background: var(--btn-locked); color: #cfc6bd; }
+    
+    .chain-btn .cost { margin-left: auto; font-size: 11px; color: #fff; text-shadow: 1px 1px 0 var(--border-color); font-weight: 700; }
+    .chain-btn .lock-icon { font-size: 12px; }
+
+    .sidebar-divider { height: 3px; background: var(--border-color); margin: 8px 5px; border-radius: 2px; }
+
+    .canvas-area {
+      grid-area: canvas;
+      position: relative;
+      background: var(--bg-dark);
+      overflow: hidden;
+    }
+
+    #hexCanvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #hexCanvas.painting { cursor: crosshair; }
+    #hexCanvas.dragging { cursor: grabbing; }
+
+    .map-info {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      font-size: 13px;
+      color: var(--text-main);
+      background: var(--bg-panel);
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 2px solid var(--border-color);
+      box-shadow: 0 3px 0 var(--border-color);
+      pointer-events: none;
+      font-weight: 700;
+    }
+
+    .build-panel {
+      grid-area: build;
+      background: var(--bg-panel);
+      border-top: 3px solid var(--border-color);
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      min-height: 0;
+      max-height: 200px;
+      z-index: 10;
+    }
+
+    .bp-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+
+    .bp-header {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text-main);
+      min-width: 60px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .build-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 2px solid var(--border-color);
+      background: #c39a6b;
+      color: var(--text-main);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: all 0.1s ease;
+      flex-shrink: 0;
+      box-shadow: 0 4px 0 var(--border-color);
+    }
+
+    .build-btn.research:disabled {
+      background: #7a6c5f;
+      opacity: 0.8;
+    }
+
+    .build-btn:active { transform: translateY(4px); box-shadow: 0 0 0 var(--border-color); }
+    .build-btn:disabled { opacity: 0.6; cursor: not-allowed; background: var(--btn-locked); transform: none; box-shadow: 0 4px 0 var(--border-color); }
+
+    .build-btn .bb-icon { font-size: 16px; }
+    .build-btn .bb-cost { font-size: 10px; color: #fff; text-shadow: 1px 1px 0 var(--border-color); }
+    .build-btn .bb-prod { font-size: 10px; color: #e8f5e9; text-shadow: 1px 1px 0 var(--success); }
+    
+    .build-btn.paint-active { border-color: #fff; background: var(--warning); box-shadow: 0 4px 0 var(--border-color); color: #fff; }
+    .build-btn.paint-active::after { content: '✏️'; font-size: 12px; margin-left: 4px; }
+    .build-btn.research { background: #85c365; }
+
+    .bp-sep { width: 10px; flex-shrink: 0; }
+    .bp-label { font-size: 12px; color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 10px; border: 2px solid var(--bg-panel); }
+    
+    @media(max-width: 700px) {
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto 1fr auto;
+        grid-template-areas:
+          "topbar"
+          "sidebar"
+          "canvas"
+          "build";
+        height: 100dvh;
+      }
+      
+      .topbar {
+        flex-wrap: wrap;
+        padding: 8px 12px;
+        gap: 8px;
+        justify-content: space-between;
+        height: auto;
+      }
+      
+      .topbar .stats {
+        margin-left: 0;
+        gap: 8px;
+      }
+
+      .sidebar {
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 8px;
+        gap: 6px;
+        border-right: none;
+        border-bottom: 3px solid var(--border-color);
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .sidebar-title {
+        display: none;
+      }
+      .sidebar-divider {
+        display: block;
+        width: 100%;
+        height: 0; 
+        margin: 0;
+      }
+      
+      .chain-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 8px 12px;
+        font-size: 12px;
+        width: auto;
+      }
+      
+      .build-panel {
+        padding: 8px 12px;
+        max-height: 35dvh;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .bp-section {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="logo">ma <span>Mani Telo</span></div>
+    <div class="stats">
+      <div class="stat-item"><span class="icon">🪙</span><span class="value" id="dispMani">0</span><span class="rate" id="dispManiRate"></span></div>
+      <div class="stat-item"><span class="icon">📖</span><span class="value" id="dispSona">0</span><span class="rate" id="dispSonaRate"></span></div>
+    </div>
+  </div>
+  <div class="sidebar" id="sidebar"></div>
+  <div class="canvas-area">
+    <canvas id="hexCanvas"></canvas>
+    <div class="map-info"><span id="tileCount">0</span> &middot; <span id="regionCount">1</span> regions</div>
+  </div>
+  <div class="build-panel" id="buildPanel">← o pana e tomo</div>
+</div>
+
+<script>
+// ===== DATA =====
+const CHAINS = [
+  { id: "moku",   name: "moku",   emoji: "🌾", price: 1,  color: "#fbbf24", terrain: "#a3d977", regionCost: 0 },
+  { id: "soweli", name: "soweli", emoji: "🐑", price: 2,  color: "#a78bfa", terrain: "#86c166", regionCost: 1000 },
+  { id: "kala",   name: "kala",   emoji: "🐟", price: 3,  color: "#60a5fa", terrain: "#7cbd6b", regionCost: 10000 },
+  { id: "kasi",   name: "kasi",   emoji: "🌿", price: 4,  color: "#4ade80", terrain: "#5ea852", regionCost: 50000 },
+  { id: "kiwen",  name: "kiwen",  emoji: "🪨", price: 5,  color: "#9ca3af", terrain: "#8a8a7a", regionCost: 500000 },
+  { id: "wawa",   name: "wawa",   emoji: "⚡", price: 6,  color: "#f87171", terrain: "#a06a4a", regionCost: 2500000 },
+];
+
+const RAW_BUILDINGS = {
+  moku:   [[1, "ma pan", "🌾", 4], [3, "tomo seli kili", "🔥", 40], [8, "tomo sewi kili", "🏠", 400], [20, "ilo pali moku", "⚙️", 4000]],
+  soweli: [[1, "ma soweli", "🌱", 4], [3, "tomo soweli", "🏠", 40], [8, "tomo pali soweli sin", "🏭", 400], [20, "tomo pali moku soweli", "🍖", 4000]],
+  kala:   [[1, "tomo alasa kala", "🎣", 4], [3, "tomo tawa alasa kala", "🚤", 40], [8, "ilo alasa kala", "🎏", 400], [20, "ilo suli alasa kala", "🐋", 4000]],
+  kasi:   [[1, "ma kasi", "🌱", 4], [3, "ilo alasa kasi", "🔪", 40], [8, "ilo tawa alasa kasi", "🚜", 400], [20, "tomo pali kasi sin", "🌿", 4000]],
+  kiwen:  [[1, "ma kiwen", "⛰️", 4], [3, "lupa suli kiwen", "🕕", 40], [8, "ilo alasa kiwen", "⛏️", 400], [20, "ilo alasa mun", "🌕", 4000]],
+  wawa:   [[1, "tomo wawa kon", "💨", 4], [3, "tomo wawa seli", "🌋", 40], [8, "tomo wawa kiwen pakala", "⚛️", 400], [20, "tomo wawa ijo pakala", "☢️", 4000]]
+};
+
+const BD = {};
+Object.entries(RAW_BUILDINGS).forEach(([chain, levels]) => {
+  levels.forEach(([prod, name, emoji, cost], i) => {
+    BD[`${chain}_${i + 1}`] = { chain, level: i + 1, prod, name, emoji, cost };
+  });
+});
+
+const INFA_DATA = {
+  esun: [[5, "esun", "🏪", 50], [15, "esun suli", "🏬", 250], [50, "ilo esun", "🛒", 1000], [200, "ilo esun nasa", "🤯", 5000]],
+  sona: [[0.1, "kulupu jan sona", "👥", 100], [0.5, "tomo sona", "📚", 500], [2, "tomo pali sona", "🔬", 2000], [10, "ilo sona", "🧠", 10000]]
+};
+
+const IF = {};
+Object.entries(INFA_DATA).forEach(([cat, levels]) => {
+  levels.forEach(([p, name, emoji, cost], i) => {
+    IF[`${cat}_${i + 1}`] = cat === "esun" 
+      ? { cat, level: i + 1, throughput: p, name, emoji, cost } 
+      : { cat, level: i + 1, prod: p, name, emoji, cost };
+  });
+});
+
+const RCOST = {};
+CHAINS.forEach((c) => {
+  RCOST[`${c.id}_2`] = 600;
+  RCOST[`${c.id}_3`] = 12500;
+  RCOST[`${c.id}_4`] = 250000;
+});
+
+const ZC = [
+  { id: "moku", q: 0, r: -3 }, 
+  { id: "soweli", q: 0, r: 10 },
+  { id: "kala", q: 12, r: 2 },  
+  { id: "kasi", q: 11, r: -8 },
+  { id: "kiwen", q: -3, r: -12 }, 
+  { id: "wawa", q: -11, r: 4 }
+];
+
+// ===== ISLAND GEN =====
+function srand(s) {
+  let x = s;
+  return () => {
+    x = (x * 1103515245 + 12345) & 0x7fffffff;
+    return x / 0x7fffffff;
+  };
+}
+const DR = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
+
+function genOrg(qc, rc, tg, seed) {
+  const rng = srand(seed);
+  const cl = new Set();
+  const kf = (q, r) => `${q},${r}`;
+  cl.add(kf(qc, rc));
+  let sz = 1;
+  const fm = new Map();
+  
+  DR.forEach(([dq, dr]) => fm.set(kf(qc + dq, rc + dr), 1));
+  
+  while (sz < tg && fm.size > 0) {
+    const a = [];
+    let tw = 0;
+    for (const [p, c] of fm) {
+      const w = c * c + rng() * 4;
+      a.push({ k: p, w });
+      tw += w;
+    }
+    if (tw === 0) break;
+    
+    let r = rng() * tw;
+    let ch = null;
+    for (const i of a) {
+      r -= i.w;
+      if (r <= 0) { ch = i.k; break; }
+    }
+    if (ch === null) ch = a[a.length - 1].k;
+    
+    cl.add(ch);
+    sz++;
+    fm.delete(ch);
+    
+    const [cq, cr] = ch.split(",").map(Number);
+    DR.forEach(([dq, dr]) => {
+      const nk = kf(cq + dq, cr + dr);
+      if (cl.has(nk) === false) fm.set(nk, (fm.get(nk) || 0) + 1);
+    });
+  }
+  return Array.from(cl).map(k => {
+    const [q, r] = k.split(",").map(Number);
+    return { q, r };
+  });
+}
+
+function hDist(a, b) {
+  return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.q + a.r - b.q - b.r)) / 2;
+}
+
+function voronoi(hxs, cs, mt) {
+  const ass = {};
+  const br = new Set();
+  hxs.forEach(({ q, r }) => {
+    const k = `${q},${r}`;
+    let md = Infinity;
+    let sd = Infinity;
+    let ne = "moku";
+    
+    cs.forEach(c => {
+      const d = hDist({ q, r }, c);
+      if (d < md) { sd = md; md = d; ne = c.id; }
+      else if (d < sd) sd = d;
+    });
+    
+    if (sd <= mt) br.add(k);
+    ass[k] = { region: ne, border: br.has(k) };
+  });
+  return ass;
+}
+
+const ISEED = 777;
+const ISLAND_SIZE = 85;
+const iHex = [];
+const hexSet = new Set();
+
+ZC.forEach((c, i) => {
+  const island = genOrg(c.q, c.r, ISLAND_SIZE, ISEED + i);
+  island.forEach(h => {
+    const k = `${h.q},${h.r}`;
+    if (hexSet.has(k) === false) {
+      hexSet.add(k);
+      iHex.push(h);
+    }
+  });
+});
+
+const rAss = voronoi(iHex, ZC, 2);
+
+// ===== HEX MATH =====
+const S3 = Math.sqrt(3);
+function hc(q, r, s) { return { x: s * 1.5 * q, y: s * (S3 / 2 * q + S3 * r) }; }
+function hco(cx, cy, s, i) { 
+  const a = Math.PI / 180 * (60 * i); 
+  return { x: cx + s * Math.cos(a), y: cy + s * Math.sin(a) }; 
+}
+function p2h(px, py, s) { 
+  return cr((px * 2 / 3) / s, (-px / 3 + S3 / 3 * py) / s); 
+}
+function cr(fq, fr) {
+  const fx = fq, fz = fr, fy = -fx - fz;
+  let rx = Math.round(fx), ry = Math.round(fy), rz = Math.round(fz);
+  const xd = Math.abs(rx - fx), yd = Math.abs(ry - fy), zd = Math.abs(rz - fz);
+  
+  if (xd > yd && xd > zd) rx = -ry - rz;
+  else if (yd > zd) ry = -rx - rz;
+  else rz = -rx - ry;
+  
+  return { q: rx, r: rz };
+}
+
+// ===== STATE =====
+const st = {
+  mani: 100, sona: 0, rs: {}, pr: {}, mt: 0, sr: 0,
+  tick: 0, tiles: {}, cam: { px: 0, py: 0, zm: 1 },
+  ds: null, id: false, sh: null,
+  pm: null, uc: ["moku"], rsch: {}, _lt: 0,
+  rg: {}, ro: ["moku", "soweli", "kala", "kasi", "kiwen", "wawa"],
+};
+
+CHAINS.forEach(c => {
+  st.rs[c.id] = 0;
+  st.pr[c.id] = 0;
+  st.rsch[c.id] = [true, false, false, false];
+  st.rg[c.id] = { unlocked: c.id === "moku" };
+});
+
+iHex.forEach(({ q, r }) => {
+  const k = `${q},${r}`;
+  const ra = rAss[k];
+  if (ra) st.tiles[k] = { bld: null, region: ra.region, mtn: ra.border };
+});
+
+// ===== SAVE/LOAD SYSTEM =====
+function saveGame() {
+  const blds = {};
+  Object.entries(st.tiles).forEach(([k, v]) => {
+    if (v.bld) blds[k] = v.bld;
+  });
+  
+  const saveData = {
+    mani: st.mani,
+    sona: st.sona,
+    rs: st.rs,
+    tick: st.tick,
+    uc: st.uc,
+    rsch: st.rsch,
+    rg: st.rg,
+    blds: blds
+  };
+  localStorage.setItem("tokiPonaSave", JSON.stringify(saveData));
+}
+
+function loadGame() {
+  const saved = localStorage.getItem("tokiPonaSave");
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      st.mani = data.mani || 100;
+      st.sona = data.sona || 0;
+      if (data.rs) Object.assign(st.rs, data.rs);
+      st.tick = data.tick || 0;
+      if (data.uc) st.uc = data.uc;
+      if (data.rsch) Object.assign(st.rsch, data.rsch);
+      if (data.rg) Object.assign(st.rg, data.rg);
+      
+      if (data.blds) {
+        Object.entries(data.blds).forEach(([k, b]) => {
+          if (st.tiles[k]) st.tiles[k].bld = b;
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+
+// ===== GAME LOGIC =====
+const BT = 2;
+function iul(c) { return st.uc.includes(c); }
+function crs(c, l) { return st.rsch[c] && st.rsch[c][l - 1]; }
+
+function isWawaL3Complete() {
+  const wawaTiles = Object.values(st.tiles).filter(t => t.region === "wawa" && t.mtn === false);
+  if (wawaTiles.length === 0) return false;
+  return wawaTiles.every(t => t.bld === "wawa_3");
+}
+
+function ulk(cid) {
+  const ch = CHAINS.find(c => c.id === cid);
+  if (!ch || iul(cid) || st.mani < ch.regionCost) return;
+  st.mani -= ch.regionCost;
+  st.uc.push(cid);
+  st.rg[cid].unlocked = true;
+  rcR();
+  rA();
+}
+
+function rsl(cid, l) {
+  const c = RCOST[`${cid}_${l}`];
+  if (c === undefined || st.rsch[cid][l - 1] === true || st.sona < c) return;
+  if (l === 4 && isWawaL3Complete() === false) return;
+  
+  st.sona -= c;
+  st.rsch[cid][l - 1] = true;
+  rcR();
+  rA();
+}
+
+function plB(tk, bk) {
+  if (!st.tiles[tk] || st.tiles[tk].bld || st.tiles[tk].mtn) return false;
+  const b = BD[bk] || IF[bk];
+  if (!b || st.mani < (b.cost || 0)) return false;
+  if (b.chain && (!iul(b.chain) || !crs(b.chain, b.level))) return false;
+  
+  st.mani -= (b.cost || 0);
+  st.tiles[tk].bld = bk;
+  return true;
+}
+
+// ===== DEMOLISH BUILDING =====
+function dmB(tk) {
+  if (st.tiles[tk] && st.tiles[tk].bld) st.tiles[tk].bld = null;
+}
+
+function rcR() {
+  CHAINS.forEach(c => st.pr[c.id] = 0);
+  st.mt = 0;
+  st.sr = 0;
+  Object.values(st.tiles).forEach(t => {
+    if (!t.bld) return;
+    const b = BD[t.bld] || IF[t.bld];
+    if (!b) return;
+    if (b.prod !== undefined) {
+      if (b.chain) st.pr[b.chain] += b.prod;
+      else st.sr += b.prod;
+    }
+    if (b.throughput !== undefined) st.mt += b.throughput;
+  });
+  saveGame();
+}
+
+// ===== TICK ENGINE =====
+function gT() {
+  st.tick++;
+  CHAINS.forEach(c => st.rs[c.id] += st.pr[c.id]);
+  st.sona += st.sr;
+  let r = 2 + st.mt;
+  [...CHAINS].sort((a, b) => b.price - a.price).forEach(c => {
+    if (st.rs[c.id] <= 0 || r <= 0) return;
+    const s = Math.min(st.rs[c.id], r);
+    st.rs[c.id] -= s;
+    r -= s;
+    st.mani += s * c.price;
+  });
+  uS();
+  saveGame();
+}
+
+// ===== RENDERING SYSTEM =====
+const cn = document.getElementById("hexCanvas");
+const cx = cn.getContext("2d");
+let ai = null;
+
+function rC() {
+  const r = cn.parentElement.getBoundingClientRect();
+  cn.width = r.width * devicePixelRatio;
+  cn.height = r.height * devicePixelRatio;
+  cn.style.width = `${r.width}px`;
+  cn.style.height = `${r.height}px`;
+  cx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  rG();
+}
+function gsz() { return 20 * st.cam.zm; }
+
+function hxRand(q, r, s) {
+  const x = (q * 374761393 + r * 668265263 + s) | 0;
+  return ((x ^ (x >> 13)) * 1274126177 & 0x7fffffff) / 0x7fffffff;
+}
+
+const TK = {
+  moku:   { h: 108, s: 38, l: 32 },
+  soweli: { h: 98,  s: 38, l: 35 },
+  kala:   { h: 152, s: 0, l: 90 },
+  kasi:   { h: 112, s: 45, l: 27 },
+  kiwen:  { h: 48,  s: 8,  l: 40 },
+  wawa:   { h: 30,  s: 30, l: 35 },
+};
+
+function hsl(h, s, l, a) {
+  return a !== undefined ? `hsla(${h},${s}%,${l}%,${a})` : `hsl(${h},${s}%,${l}%)`;
+}
+
+function drTree(cx, x, y, s, rng, type) {
+  const base = s * 0.28;
+  const trunkW = base * 0.16, trunkH = base * 0.55;
+  
+  cx.fillStyle = `hsl(30,25%,${18 + Math.floor(rng * 8)}%)`;
+  cx.beginPath();
+  cx.moveTo(x - trunkW * 0.5, y + trunkH * 0.3);
+  cx.lineTo(x - trunkW, y - trunkH * 0.5);
+  cx.lineTo(x + trunkW, y - trunkH * 0.5);
+  cx.lineTo(x + trunkW * 0.5, y + trunkH * 0.3);
+  cx.closePath();
+  cx.fill();
+
+  const hShade = type === 1 ? 100 : 110;
+  const lBase = 20 + Math.floor(rng * 8);
+  const layers = type === 1 ? 2 : 3;
+
+  for (let i = layers - 1; i >= 0; i--) {
+    const t = i / (layers - 1);
+    const rad = base * (0.35 + t * 0.55) * (1 - Math.abs(rng - 0.5) * 0.15);
+    const ox = rng * base * 0.3 - base * 0.15;
+    const oy = -base * 0.55 - t * base * 0.3;
+    const lyrL = lBase + i * 4;
+
+    cx.beginPath();
+    if (type === 1) {
+      const tw = rad, th = base * 0.45;
+      cx.moveTo(x + ox, y + oy - th * 0.2);
+      cx.lineTo(x + ox + tw, y + oy + th * 0.8);
+      cx.lineTo(x + ox - tw, y + oy + th * 0.8);
+    } else {
+      cx.arc(x + ox, y + oy, rad, 0, Math.PI * 2);
+    }
+    cx.closePath();
+    cx.fillStyle = hsl(hShade - i * 4, 42, lyrL);
+    cx.fill();
+  }
+}
+
+function drRock(cx, x, y, s, rng, size) {
+  const r = s * 0.12 * (0.5 + size * 0.5);
+  const rx = r * (0.5 + rng * 0.35), ry = r * (0.55 + rng * 0.25);
+  const gray = 32 + Math.floor(rng * 16), hue = 42 + Math.floor(rng * 16);
+
+  cx.beginPath();
+  cx.ellipse(x, y, rx, ry, rng * 0.12, 0, Math.PI * 2);
+  cx.fillStyle = `hsl(${hue}, 8%, ${gray}%)`;
+  cx.fill();
+
+  cx.strokeStyle = "rgba(0,0,0,0.06)";
+  cx.lineWidth = 0.5;
+  cx.beginPath();
+  cx.moveTo(x - rx * 0.25, y - ry * 0.05);
+  cx.quadraticCurveTo(x + rx * 0.1, y + ry * 0.18, x + rx * 0.25, y + ry * 0.02);
+  cx.stroke();
+}
+
+function drBush(cx, x, y, s, rng) {
+  const r = s * 0.14 * (0.4 + rng * 0.4);
+  const hue = 105 + Math.floor(rng * 18);
+  const light = 22 + Math.floor(rng * 10);
+
+  cx.fillStyle = hsl(hue, 45, light);
+  cx.beginPath(); cx.arc(x - r * 0.12, y - r * 0.15, r * 0.55, 0, Math.PI * 2); cx.fill();
+  cx.fillStyle = hsl(hue + 3, 40, light + 2);
+  cx.beginPath(); cx.arc(x + r * 0.18, y + r * 0.08, r * 0.48, 0, Math.PI * 2); cx.fill();
+  cx.fillStyle = hsl(hue - 2, 48, light - 1);
+  cx.beginPath(); cx.arc(x - r * 0.08, y + r * 0.12, r * 0.38, 0, Math.PI * 2); cx.fill();
+}
+
+function drFlower(cx, x, y, s, rng, colorHue) {
+  const r = s * 0.04 * (0.4 + rng * 0.4);
+  if (r < 1.5) return;
+  const hue = colorHue !== undefined ? colorHue : Math.floor(rng * 360);
+  
+  cx.fillStyle = `hsl(${hue}, 50%, ${50 + Math.floor(rng * 12)}%)`;
+  for (let i = 0; i < 5; i++) {
+    const a = Math.PI * 2 / 5 * i + rng;
+    cx.beginPath();
+    cx.arc(x + Math.cos(a) * r * 0.45, y + Math.sin(a) * r * 0.45, r * 0.32, 0, Math.PI * 2);
+    cx.fill();
+  }
+  cx.fillStyle = "hsl(40, 50%, 30%)";
+  cx.beginPath(); cx.arc(x, y, r * 0.18, 0, Math.PI * 2); cx.fill();
+}
+
+function drGrass(cx, x, y, s, rng) {
+  const gs = s * 0.14;
+  const count = 2 + Math.floor(rng * 3);
+  const hue = 95 + Math.floor(rng * 20);
+  
+  for (let i = 0; i < count; i++) {
+    const ox = (i / count - 0.5) * gs * 0.6 + rng * gs * 0.2;
+    const oy = -gs * 0.3 + rng * gs * 0.2;
+    const gh = gs * (0.5 + rng * 0.5);
+    const gw = gs * 0.08;
+    
+    cx.fillStyle = hsl(hue + i * 5, 40, 18 + Math.floor(rng * 8));
+    cx.beginPath();
+    cx.moveTo(x + ox - gw, y + oy + gh * 0.3);
+    cx.quadraticCurveTo(x + ox + gw * 0.5, y + oy - gh * 0.5, x + ox + gw, y + oy + gh * 0.3);
+    cx.fill();
+  }
+}
+
+function drMountain(cx, px, py, sz, rng) {
+  const h = sz * (0.4 + rng * 0.35);
+  const w = sz * 0.35;
+  const skew = rng * sz * 0.12 - sz * 0.06;
+
+  cx.beginPath();
+  cx.moveTo(px + skew * 0.2, py - h - 1);
+  cx.lineTo(px + w + skew * 0.3, py + sz * 0.22);
+  cx.lineTo(px - w + skew * 0.1, py + sz * 0.22);
+  cx.closePath();
+
+  const mg = cx.createLinearGradient(px, py - h, px, py + sz * 0.2);
+  mg.addColorStop(0, "#b8c6d4"); mg.addColorStop(0.25, "#7a8f9e");
+  mg.addColorStop(0.6, "#506270"); mg.addColorStop(1, "#384753");
+  cx.fillStyle = mg; cx.fill();
+
+  cx.strokeStyle = "rgba(255,255,255,0.06)"; cx.lineWidth = 0.4; cx.stroke();
+
+  cx.beginPath();
+  cx.moveTo(px + skew * 0.2 - 1, py - h);
+  cx.lineTo(px - w + skew * 0.1, py + sz * 0.22);
+  cx.lineTo(px - w * 0.25 + skew * 0.1, py + sz * 0.22);
+  cx.lineTo(px + skew * 0.2 - 1, py - h * 0.45);
+  cx.closePath();
+  cx.fillStyle = "rgba(0,0,0,0.18)"; cx.fill();
+
+  cx.beginPath();
+  cx.moveTo(px + skew * 0.2, py - h);
+  cx.lineTo(px + w * 0.35 + skew * 0.3, py - h * 0.4);
+  cx.lineTo(px - w * 0.35 + skew * 0.1, py - h * 0.4);
+  cx.closePath();
+  cx.fillStyle = "rgba(255,255,255,0.55)"; cx.fill();
+
+  cx.strokeStyle = "rgba(0,0,0,0.04)"; cx.lineWidth = 0.5;
+  for (let i = 1; i <= 2; i++) {
+    const rr = i / 2;
+    cx.beginPath();
+    cx.moveTo(px + skew * 0.2 + rr * sz * 0.1, py - h + rr * h * 0.65);
+    cx.lineTo(px - w * 0.08 + rr * sz * 0.12, py + sz * 0.08 - rr * sz * 0.2);
+    cx.stroke();
+  }
+}
+
+function drBldIcon(cx, px, py, sz, bldKey) {
+  const b = BD[bldKey] || IF[bldKey]; 
+  if (!b) return;
+  const bs = Math.max(7, sz * 0.38);
+
+  cx.save();
+  cx.shadowColor = "rgba(0,0,0,0.25)";
+  cx.shadowBlur = 2;
+  cx.shadowOffsetX = 1;
+  cx.shadowOffsetY = 1;
+
+  cx.fillStyle = "#fff";
+  cx.font = `${bs - 1}px sans-serif`;
+  cx.textAlign = "center";
+  cx.textBaseline = "middle";
+  cx.fillText(b.emoji, px, py - 1);
+  cx.restore();
+
+  if (sz > 10) {
+    cx.fillStyle = "rgba(255,255,255,0.2)";
+    cx.font = `${Math.max(3, sz * 0.1)}px sans-serif`;
+    cx.textBaseline = "bottom";
+    cx.textAlign = "center";
+    cx.fillText(b.name, px, py + sz * S3 / 2 * 0.38);
+  }
+}
+
+function drDecor(cx, px, py, sz, region, q, r, hasBld, isMtn) {
+  if (hasBld || isMtn) return;
+
+  const r1 = hxRand(q, r, 1), r2 = hxRand(q, r, 2), r3 = hxRand(q, r, 3), r4 = hxRand(q, r, 4), r5 = hxRand(q, r, 5);
+  let density;
+  
+  if (region === "kasi") density = 0.85 + r1 * 0.15;
+  else if (region === "moku" || region === "soweli") density = 0.65 + r1 * 0.3;
+  else if (region === "kala" || region === "wawa") density = 0.5 + r1 * 0.25;
+  else if (region === "kiwen") density = 0.7 + r1 * 0.2;
+  else density = 0.5 + r1 * 0.35;
+
+  if (density < 0.2) return;
+
+  const maxR = sz * 0.7;
+  const GOLDEN = 0.618033988749895;
+  const PH = [0, 0.37, 0.71, 0.24, 0.53];
+  const placed = [];
+  const minSep = sz * 0.18;
+
+  function place(maxAttempts, minRad, maxRad, phase) {
+    let best = null, bestDist = 0;
+    for (let i = 0; i < maxAttempts; i++) {
+      const a = Math.PI * 2 * ((phase + i * GOLDEN) % 1);
+      const d = maxR * (minRad + ((i * 0.07 + r1 + phase) % 1) * (maxRad - minRad));
+      const x = px + Math.cos(a) * d, y = py - sz * 0.02 + Math.sin(a) * d * 0.82;
+
+      let ok = true;
+      for (const p of placed) {
+        const dx = x - p.x, dy = y - p.y;
+        if (Math.sqrt(dx * dx + dy * dy) < minSep) { ok = false; break; }
+      }
+      if (!ok) continue;
+
+      const dist = Math.sqrt((x - px) ** 2 + (y - py) ** 2);
+      if (dist > bestDist) { bestDist = dist; best = { x, y }; }
+    }
+    if (best) placed.push(best);
+    return best;
+  }
+
+  if (region === "kasi") {
+    const nTrees = 1 + Math.floor(r1 * 2.5);
+    for (let i = 0; i < nTrees; i++) {
+      const p = place(8, 0.1, 0.7, PH[0] + i * 0.1);
+      if (p) drTree(cx, p.x, p.y, sz, hxRand(q, r, 10 + i), r2 > 0.5 ? 1 : 0);
+    }
+    const nBushes = 1 + Math.floor(r3 * 2);
+    for (let i = 0; i < nBushes; i++) {
+      const p = place(6, 0.2, 0.75, PH[1] + i * 0.15);
+      if (p) drBush(cx, p.x, p.y, sz, hxRand(q, r, 20 + i));
+    }
+    if (r4 > 0.4) {
+      const p = place(4, 0.1, 0.6, PH[2]);
+      if (p) drFlower(cx, p.x, p.y, sz, hxRand(q, r, 30), 280 + Math.floor(r5 * 60));
+    }
+  } else if (region === "moku" || region === "soweli") {
+    const nGrass = 2 + Math.floor(r1 * 3);
+    for (let i = 0; i < nGrass; i++) {
+      const p = place(6, 0.1, 0.7, PH[0] + i * 0.12);
+      if (p) drGrass(cx, p.x, p.y, sz, hxRand(q, r, 10 + i));
+    }
+    if (r2 > 0.5) {
+      const p = place(6, 0.1, 0.6, PH[1]);
+      if (p) drTree(cx, p.x, p.y, sz, hxRand(q, r, 20), 0);
+    }
+  } else if (region === "kiwen" || region === "wawa" || region === "kala") {
+    const nRocks = 1 + Math.floor(r1 * 2);
+    for (let i = 0; i < nRocks; i++) {
+      const p = place(6, 0.1, 0.7, PH[0] + i * 0.1);
+      if (p) drRock(cx, p.x, p.y, sz, hxRand(q, r, 10 + i), 0.5 + r2 * 0.5);
+    }
+    if (r3 > 0.5) {
+      const p = place(4, 0.2, 0.6, PH[1]);
+      if (p) drGrass(cx, p.x, p.y, sz, hxRand(q, r, 20));
+    }
+  }
+}
+
+function rG() {
+  const w = cn.width / devicePixelRatio, h = cn.height / devicePixelRatio;
+  cx.clearRect(0, 0, w, h);
+  
+  const sz = gsz(), _cx = w / 2, _cy = h / 2, ox = _cx - st.cam.px, oy = _cy - st.cam.py, mg = 100;
+
+  cx.fillStyle = "#4fa1db";
+  cx.fillRect(0, 0, w, h);
+
+  Object.entries(st.tiles).forEach(([key, tile]) => {
+    const [qs, rs] = key.split(",");
+    const q = parseInt(qs), r = parseInt(rs);
+    const c = hc(q, r, sz), px = c.x + ox, py = c.y + oy;
+    
+    if (px < -mg || px > w + mg || py < -mg || py > h + mg) return;
+    
+    const isMtn = tile.mtn;
+    const isLk = st.rg[tile.region] && !st.rg[tile.region].unlocked;
+    const tc = TK[tile.region] || TK.moku;
+    
+    const fill = isMtn ? hsl(220, 8, 22) : hsl(tc.h, tc.s, tc.l);
+    const stroke = isMtn ? hsl(220, 8, 14) : hsl(tc.h, tc.s, tc.l - 12);
+    
+    cx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const co = hco(px, py, sz, i);
+      if (!i) cx.moveTo(co.x, co.y); else cx.lineTo(co.x, co.y);
+    }
+    cx.closePath();
+    cx.fillStyle = fill; cx.fill();
+    cx.strokeStyle = stroke; cx.lineWidth = 1; cx.stroke();
+
+    if (isMtn && !isLk) drMountain(cx, px, py, sz, hxRand(q, r, 99));
+    if (!isLk) drDecor(cx, px, py, sz, tile.region, q, r, !!tile.bld, isMtn);
+    if (tile.bld && !isLk) drBldIcon(cx, px, py, sz, tile.bld);
+
+    if (st.pm && !tile.bld && !isMtn && !isLk) {
+      cx.fillStyle = "rgba(255,255,255,0.06)";
+      cx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const co = hco(px, py, sz, i);
+        if (!i) cx.moveTo(co.x, co.y); else cx.lineTo(co.x, co.y);
+      }
+      cx.closePath(); cx.fill();
+      cx.fillStyle = "rgba(255,255,255,0.12)";
+      cx.font = `${Math.max(6, sz * 0.22)}px sans-serif`;
+      cx.textAlign = "center"; cx.textBaseline = "middle"; cx.fillText("+", px, py);
+    }
+  });
+
+  if (st.sh) {
+    const key = `${st.sh.q},${st.sh.r}`;
+    if (st.tiles[key]) {
+      const c = hc(st.sh.q, st.sh.r, sz), px = c.x + ox, py = c.y + oy;
+      cx.save();
+      cx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const co = hco(px, py, sz, i);
+        if (!i) cx.moveTo(co.x, co.y); else cx.lineTo(co.x, co.y);
+      }
+      cx.closePath();
+      cx.strokeStyle = "#f9fafb";
+      cx.lineWidth = 2;
+      cx.lineJoin = "round";
+      cx.stroke();
+      cx.restore();
+    }
+  }
+
+  ZC.filter(z => st.rg[z.id] && !st.rg[z.id].unlocked).forEach(z => {
+    const ch = CHAINS.find(c => c.id === z.id);
+    if (!ch) return;
+    const c = hc(z.q, z.r, sz), px = c.x + ox, py = c.y + oy;
+    if (px < -mg || px > w + mg || py < -mg || py > h + mg) return;
+    
+    cx.fillStyle = "#3e2723";
+    cx.font = `${Math.max(10, sz * 0.5)}px sans-serif`;
+    cx.textAlign = "center"; cx.textBaseline = "middle"; cx.fillText("🔒", px, py - sz * 0.15);
+    
+    cx.fillStyle = "#3e2723";
+    cx.font = `bold ${Math.max(7, sz * 0.28)}px sans-serif`;
+    cx.textBaseline = "top"; cx.fillText(`${ch.emoji} ${z.id}`, px, py + sz * 0.2);
+    
+    cx.fillStyle = "#d84315";
+    cx.font = `bold ${Math.max(6, sz * 0.22)}px sans-serif`;
+    cx.textBaseline = "top"; cx.fillText(`🪙${ch.regionCost.toLocaleString()}`, px, py + sz * 0.45);
+  });
+
+  const blt = Object.values(st.tiles).filter(t => t.bld).length;
+  document.getElementById("tileCount").textContent = `${blt} / ${Object.keys(st.tiles).length} built`;
+  document.getElementById("regionCount").textContent = st.uc.length;
+}
+
+// ===== UI SYSTEM =====
+function fm(n) {
+  if (typeof n !== "number") return "0";
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return Math.floor(n).toLocaleString();
+}
+
+function fmr(n) {
+  if (!n || n === 0) return "";
+  return (n >= 0 ? "+" : "") + (n >= 1 ? fm(n) : n.toFixed(2)) + "/s";
+}
+
+function uS() {
+  document.getElementById("dispMani").textContent = fm(st.mani);
+  const rw = CHAINS.reduce((s, c) => s + st.pr[c.id] * c.price, 0);
+  const cp = BT + st.mt;
+  const tp = CHAINS.reduce((s, c) => s + st.pr[c.id], 0);
+  const av = tp > 0.001 ? CHAINS.reduce((s, c) => s + c.price * st.pr[c.id], 0) / tp : 1;
+  
+  document.getElementById("dispManiRate").textContent = fmr(Math.min(rw, cp * av)) + (rw > cp * av ? ` cap ${fm(cp)}/s` : "");
+  document.getElementById("dispSona").textContent = st.sona < 10 ? st.sona.toFixed(1) : fm(st.sona);
+  document.getElementById("dispSonaRate").textContent = fmr(st.sr);
+}
+
+function uSb() {
+  const sb = document.getElementById("sidebar");
+  let h = `<div class="sidebar-title">Regions</div>`;
+  
+  CHAINS.forEach(ch => {
+    const ul = iul(ch.id);
+    h += `<button class="chain-btn ${ul ? "unlocked" : "locked"}" data-chain="${ch.id}" data-locked="${!ul}">
+            <span>${ch.emoji}</span><span>${ch.name}</span>
+            ${!ul 
+              ? `<span class="lock-icon">🔒</span><span class="cost">🪙${fm(ch.regionCost)}</span>` 
+              : `<span style="margin-left:auto;font-size:10px;color:var(--success)">●</span>`}
+          </button>`;
+  });
+  
+  h += `<div class="sidebar-divider"></div><div class="sidebar-title">Research</div>`;
+  
+  CHAINS.forEach(ch => {
+    const ul = iul(ch.id);
+    const s = st.rsch[ch.id] || [true, false, false, false];
+    let dot = "";
+    for (let i = 0; i < 4; i++) dot += s[i] ? "●" : "○";
+    
+    const nxt = (ul === false) ? -1 : (s[3] === true) ? -1 : s.findIndex(v => v === false) + 1;
+    const reqWawa = (nxt === 4 && isWawaL3Complete() === false);
+    
+    h += `<button class="chain-btn ${ul === true && reqWawa === false ? "unlocked" : "locked"}" style="padding:8px" data-chain="${ch.id}" data-research="${nxt}">
+            <span>${ch.emoji}</span><span>${ch.name}</span>
+            <span style="margin-left:auto;font-size:10px;color:var(--text-muted)">${dot}</span>
+            ${nxt > 0 && ul === true ? `<span class="cost">${reqWawa ? "🔒wawa L3" : `📖${fm(RCOST[`${ch.id}_${nxt}`] || 0)}`}</span>` : ""}
+          </button>`;
+  });
+  
+  sb.innerHTML = h;
+  sb.querySelectorAll(".chain-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const cid = btn.dataset.chain;
+      if (btn.dataset.locked === "true") ulk(cid);
+      else {
+        const lv = parseInt(btn.dataset.research);
+        if (lv > 0) rsl(cid, lv);
+      }
+    });
+  });
+}
+
+function uBP() {
+  const p = document.getElementById("buildPanel");
+  const sel = st.sh;
+  const sk = sel ? `${sel.q},${sel.r}` : "";
+  const tile = sk ? st.tiles[sk] : null; 
+  let h = "";
+  
+  if (tile) {
+    if (tile.mtn) {
+      h = `<div class="bp-section"><span class="bp-header">Mountain</span><span class="bp-label">Build restricted</span></div>`;
+      p.innerHTML = h; return;
+    }
+    if (tile.bld) {
+      const b = BD[tile.bld] || IF[tile.bld];
+      if (b) {
+        h = `<div class="bp-section" style="border-bottom: 3px solid var(--border-color); padding-bottom: 8px;">
+              <span class="bp-header">${b.emoji} ${b.name}</span>
+              <span class="bp-label">${b.throughput ? `cap +${b.throughput}` : (b.prod ? `+${b.prod} ${b.chain || "sona"}/s` : "")}</span>
+              <span class="bp-sep"></span>
+              <button class="build-btn" style="background:var(--danger)" id="selDel">🗑️ Remove</button>
+             </div>`;
+        p.innerHTML = h;
+        document.getElementById("selDel")?.addEventListener("click", () => {
+          if (st.sh) dmB(`${st.sh.q},${st.sh.r}`);
+          rcR(); rA();
+        });
+        return;
+      }
+    } else {
+      const lk = st.rg[tile.region] && !st.rg[tile.region].unlocked;
+      if (lk) {
+        h = `<div class="bp-section"><span class="bp-header">Locked</span><span class="bp-label">Unlock ${tile.region} first</span></div>`;
+        p.innerHTML = h; return;
+      }
+      h = `<div class="bp-section" style="border-bottom: 3px solid var(--border-color); padding-bottom: 8px;">
+            <span class="bp-header">${tile.region}</span><span class="bp-label">Select building</span>
+           </div>`;
+    }
+  } else {
+    h = `<div class="bp-section"><span class="bp-header">Select Tile</span></div>`;
+    p.innerHTML = h; return;
+  }
+
+  const rid = tile.region || "moku";
+  const ch = CHAINS.find(c => c.id === rid);
+  if (ch && iul(rid)) {
+    const bs = [];
+    for (let l = 1; l <= 4; l++) {
+      const k = `${rid}_${l}`;
+      const b = BD[k];
+      if (b) bs.push({ k, b, rr: crs(rid, l), af: st.mani >= b.cost });
+    }
+    if (bs.length) {
+      h += `<div class="bp-section"><span class="bp-header">${ch.emoji}</span>`;
+      bs.forEach(({ k, b, rr, af }) => {
+        const pa = st.pm === k;
+        h += `<button class="build-btn ${pa ? "paint-active" : ""} ${!rr ? "research" : ""}" data-build="${k}" ${(rr && !af) || (!rr && st.sona < (RCOST[k] || 0)) ? "disabled" : ""} data-research="${rr ? "no" : "yes"}">
+                <span class="bb-icon">${b.emoji}</span><span class="bb-name">${b.name}</span>
+                <span class="bb-cost">${rr ? `🪙${b.cost}` : `📖${RCOST[k] || "?"}`}</span>
+                <span class="bb-prod">+${b.prod}/s</span>
+              </button>`;
+      });
+      h += `</div>`;
+    }
+  }
+
+  ["esun", "sona"].forEach(cat => {
+    const its = Object.entries(IF).filter(([k, d]) => d.cat === cat);
+    h += `<div class="bp-section"><span class="bp-header">${cat}</span>`;
+    its.forEach(([k, b]) => {
+      const pa = st.pm === k;
+      const af = st.mani >= b.cost;
+      h += `<button class="build-btn ${pa ? "paint-active" : ""}" data-build="${k}" ${!af ? "disabled" : ""}>
+              <span class="bb-icon">${b.emoji}</span><span class="bb-name">${b.name}</span>
+              <span class="bb-cost">🪙${b.cost}</span>
+              <span class="bb-prod">${b.throughput ? `cap+${b.throughput}` : `+${b.prod}`}</span>
+            </button>`;
+    });
+    h += `</div>`;
+  });
+  
+  if (st.pm) h += `<div class="bp-section"><button class="build-btn" style="background:var(--danger)" id="exitPt">Stop painting</button></div>`;
+  p.innerHTML = h;
+
+  p.querySelectorAll(".build-btn[data-build]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const k = btn.dataset.build;
+      if (btn.dataset.research === "yes") {
+        const b = BD[k];
+        if (b && b.chain) {
+          const c = RCOST[k];
+          if (c && st.sona >= c) {
+            st.sona -= c; st.rsch[b.chain][b.level - 1] = true; rcR(); rA();
+          }
+        }
+        return;
+      }
+      if (st.pm === k) st.pm = null;
+      else st.pm = k;
+      cn.classList.toggle("painting", !!st.pm);
+      rA();
+    });
+  });
+  
+  document.getElementById("exitPt")?.addEventListener("click", () => {
+    st.pm = null; cn.classList.remove("painting"); rA();
+  });
+}
+
+// ===== CANVAS EVENTS =====
+cn.addEventListener("mousedown", e => {
+  st.ds = { mx: e.clientX, my: e.clientY, px: st.cam.px, py: st.cam.py };
+  st.id = false;
+});
+cn.addEventListener("mousemove", e => {
+  if (st.ds) {
+    const dx = e.clientX - st.ds.mx, dy = e.clientY - st.ds.my;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) st.id = true;
+    if (st.id) {
+      cn.classList.add("dragging");
+      st.cam.px = st.ds.px - dx;
+      st.cam.py = st.ds.py - dy;
+      rG();
+    }
+  }
+});
+cn.addEventListener("mouseup", e => {
+  if (!st.ds) return;
+  const wa = st.id;
+  st.ds = null; st.id = false; cn.classList.remove("dragging");
+  if (wa) { rG(); return; }
+  
+  const r = cn.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const sz = gsz();
+  const vw = cn.width / devicePixelRatio, vh = cn.height / devicePixelRatio;
+  const wx = mx - vw / 2 + st.cam.px, wy = my - vh / 2 + st.cam.py;
+  const hex = p2h(wx, wy, sz);
+  const key = `${hex.q},${hex.r}`;
+  
+  if (!st.tiles[key]) return;
+  if (st.pm) {
+    const tile = st.tiles[key];
+    if (!tile.bld && !tile.mtn && st.rg[tile.region] && st.rg[tile.region].unlocked) {
+      if (plB(key, st.pm)) { rcR(); rA(); }
+    }
+  } else {
+    st.sh = hex; rG(); uBP();
+  }
+});
+cn.addEventListener("mouseleave", () => { st.ds = null; st.id = false; cn.classList.remove("dragging"); });
+
+// ===== TOUCH EVENTS (MOBILE) =====
+cn.addEventListener("touchstart", e => {
+  const t = e.touches[0];
+  st.ds = { mx: t.clientX, my: t.clientY, px: st.cam.px, py: st.cam.py };
+  st.id = false;
+}, { passive: true });
+
+cn.addEventListener("touchmove", e => {
+  if (st.ds) {
+    const t = e.touches[0];
+    const dx = t.clientX - st.ds.mx, dy = t.clientY - st.ds.my;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) st.id = true;
+    if (st.id === true) {
+      cn.classList.add("dragging");
+      st.cam.px = st.ds.px - dx;
+      st.cam.py = st.ds.py - dy;
+      rG();
+    }
+  }
+}, { passive: true });
+
+cn.addEventListener("touchend", e => {
+  if (st.ds === null) return;
+  const wa = st.id;
+  st.ds = null; st.id = false; cn.classList.remove("dragging");
+  if (wa === true) { rG(); return; }
+  
+  const t = e.changedTouches[0];
+  const r = cn.getBoundingClientRect();
+  const mx = t.clientX - r.left, my = t.clientY - r.top;
+  const sz = gsz();
+  const vw = cn.width / devicePixelRatio, vh = cn.height / devicePixelRatio;
+  const wx = mx - vw / 2 + st.cam.px, wy = my - vh / 2 + st.cam.py;
+  const hex = p2h(wx, wy, sz);
+  const key = `${hex.q},${hex.r}`;
+  
+  if (st.tiles[key] === undefined) return;
+  if (st.pm) {
+    const tile = st.tiles[key];
+    if (tile.bld === null && tile.mtn === false && st.rg[tile.region] && st.rg[tile.region].unlocked === true) {
+      if (plB(key, st.pm) === true) { rcR(); rA(); }
+    }
+  } else {
+    st.sh = hex; rG(); uBP();
+  }
+});
+
+cn.addEventListener("wheel", e => {
+  e.preventDefault();
+  st.cam.zm = Math.max(0.3, Math.min(2.5, st.cam.zm * (1 - e.deltaY * 0.001)));
+  rG();
+}, { passive: false });
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && st.pm) { st.pm = null; cn.classList.remove("painting"); rA(); }
+});
+
+// ===== INIT =====
+function rA() { uSb(); uS(); uBP(); rG(); }
+function gL(ts) {
+  if (!st._lt) st._lt = ts;
+  if (ts - st._lt >= 1000) { gT(); st._lt = ts; }
+  ai = requestAnimationFrame(gL);
+}
+
+window.addEventListener("resize", rC);
+rC(); 
+loadGame();
+rcR(); 
+rA();
+st._lt = performance.now();
+ai = requestAnimationFrame(gL);
+</script>
+</body>
+</html>
