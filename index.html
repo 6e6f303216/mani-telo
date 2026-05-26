@@ -607,15 +607,37 @@ function rcR() {
   CHAINS.forEach(c => st.pr[c.id] = 0);
   st.mt = 0;
   st.sr = 0;
-  Object.values(st.tiles).forEach(t => {
+
+  const kf = (q, r) => `${q},${r}`;
+
+  Object.entries(st.tiles).forEach(([k, t]) => {
     if (!t.bld) return;
     const b = BD[t.bld] || IF[t.bld];
     if (!b) return;
-    if (b.prod !== undefined) {
-      if (b.chain) st.pr[b.chain] += b.prod;
-      else st.sr += b.prod;
+
+    let bonus = 1;
+    const [q, r] = k.split(",").map(Number);
+
+    if (b.cat === "esun") {
+      const adjTypes = new Set();
+      DR.forEach(([dq, dr]) => {
+        const nb = st.tiles[kf(q + dq, r + dr)]?.bld;
+        if (nb && BD[nb]) adjTypes.add(BD[nb].chain);
+      });
+      bonus = 1 + adjTypes.size * 0.1; // +10% per unique adjacent resource type
+    } else if (b.cat === "sona") {
+      const hasAdjSona = DR.some(([dq, dr]) => {
+        const nb = st.tiles[kf(q + dq, r + dr)]?.bld;
+        return nb && IF[nb] && IF[nb].cat === "sona";
+      });
+      if (hasAdjSona) bonus = 1.2; // +20% if adjacent to another sona building
     }
-    if (b.throughput !== undefined) st.mt += b.throughput;
+
+    if (b.prod !== undefined) {
+      if (b.chain) st.pr[b.chain] += b.prod * bonus;
+      else st.sr += b.prod * bonus;
+    }
+    if (b.throughput !== undefined) st.mt += b.throughput * bonus;
   });
   saveGame();
 }
